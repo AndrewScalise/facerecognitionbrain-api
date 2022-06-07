@@ -1,10 +1,12 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const bcrypt = require("bcrypt");
+const cors = require("cors");
 const saltRounds = 10;
 
 const app = express();
 app.use(bodyParser.json());
+app.use(cors());
 
 const database = {
   users: [
@@ -48,10 +50,10 @@ app.get("/users", (req, res) => {
 
 app.post("/signin", (req, res) => {
   if (
-    req.body.email === database.users[0] &&
+    req.body.email === database.users[0].email &&
     req.body.password === database.users[0].password
   ) {
-    res.json("success");
+    res.json(database.users[0]);
   } else {
     res.status(400).json("error logging in");
   }
@@ -64,15 +66,15 @@ app.post("/register", (req, res) => {
     bcrypt.hash(password, salt, function (err, hash) {
       encryptedPassword = hash;
       console.log(encryptedPassword);
+      database.users.push({
+        id: "213",
+        name: name,
+        email: email,
+        password: encryptedPassword,
+        entries: 0,
+        joined: new Date(),
+      });
     });
-  });
-  database.users.push({
-    id: "213",
-    name: name,
-    email: email,
-    password: encryptedPassword,
-    entries: 0,
-    joined: new Date(),
   });
   res.json(database.users[database.users.length - 1]);
 });
