@@ -3,10 +3,26 @@ const bodyParser = require("body-parser");
 const bcrypt = require("bcrypt");
 const cors = require("cors");
 const saltRounds = 10;
+const knex = require("knex");
+const db = knex({
+  client: "pg",
+  connection: {
+    host: "127.0.0.1",
+    user: "postgres",
+    password: "test",
+    database: "smart-brain",
+  },
+});
 
 const app = express();
 app.use(bodyParser.json());
 app.use(cors());
+
+db.select("*")
+  .from("users")
+  .then((data) => {
+    console.log(data);
+  });
 
 const database = {
   users: [
@@ -61,22 +77,17 @@ app.post("/signin", (req, res) => {
 
 app.post("/register", (req, res) => {
   const { email, name, password } = req.body;
-  let encryptedPassword = "";
-  bcrypt.genSalt(saltRounds, function (err, salt) {
-    bcrypt.hash(password, salt, function (err, hash) {
-      encryptedPassword = hash;
-      console.log(encryptedPassword);
-      database.users.push({
-        id: "213",
-        name: name,
-        email: email,
-        password: encryptedPassword,
-        entries: 0,
-        joined: new Date(),
-      });
-    });
-  });
-  res.json(database.users[database.users.length - 1]);
+  db("users")
+    .returning("*")
+    .insert({
+      email: email,
+      name: name,
+      joined: new Date(),
+    })
+    .then((user) => {
+      res.json(user[0]);
+    })
+    .catch((err) => res.status(400).json(err));
 });
 
 app.get("/profile/:id", (req, res) => {
