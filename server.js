@@ -18,44 +18,10 @@ const app = express();
 app.use(bodyParser.json());
 app.use(cors());
 
-const database = {
-  users: [
-    {
-      id: "123",
-      name: "john",
-      email: "john@gmail.com",
-      password: "cookies",
-      entries: "0",
-      joined: new Date(),
-    },
-    {
-      id: "1234",
-      name: "bob",
-      email: "bob@gmail.com",
-      password: "bobsburgers",
-      entries: "2",
-      joined: new Date(),
-    },
-    {
-      id: "12345",
-      name: "molly",
-      email: "molly@gmail.com",
-      password: "mollies",
-      entries: "10",
-      joined: new Date(),
-    },
-  ],
-  login: [
-    {
-      id: "987",
-      hash: "",
-      email: "john@gmail.com",
-    },
-  ],
-};
-
 app.get("/users", (req, res) => {
-  res.send(database);
+  db.select("*")
+    .from("users")
+    .then((users) => res.json(users.sort((a, b) => a.id - b.id)));
 });
 
 app.post("/signin", (req, res) => {
@@ -71,17 +37,35 @@ app.post("/signin", (req, res) => {
 
 app.post("/register", (req, res) => {
   const { email, name, password } = req.body;
-  db("users")
-    .returning("*")
-    .insert({
-      email: email,
-      name: name,
-      joined: new Date(),
-    })
-    .then((user) => {
-      res.json(user[0]);
-    })
-    .catch((err) => res.status(400).json(err));
+  let encryptedPassword = "";
+  bcrypt.genSalt(saltRounds, function (err, salt) {
+    bcrypt.hash(password, salt, function (err, hash) {
+      encryptedPassword = hash;
+      db.transaction((trx) => {
+        trx
+          .insert({
+            hash: hash,
+            email: email,
+          })
+          .into("login")
+          .returning("email")
+          .then((loginEmail) => {
+            return trx("users")
+              .returning("*")
+              .insert({
+                email: loginEmail[0].email,
+                name: name,
+                joined: new Date(),
+              })
+              .then((user) => {
+                res.json(user[0]);
+              });
+          })
+          .then(trx.commit)
+          .catch(trx.rollback);
+      }).catch((err) => res.status(400).json("unable to register"));
+    });
+  });
 });
 
 app.get("/profile/:id", (req, res) => {
